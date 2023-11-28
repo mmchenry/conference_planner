@@ -56,13 +56,26 @@ Once the sessions have been established, then the DPOs will determine the sessio
 
 - You now have access to the Python code needed for Conference Planner. However, the data are stored elsewhere on your Drive. If you are a DPO, then you will need the PO to grant you access to your divisional directory.
 
-- Select "Locate on Drive" in the notebook's File menu, to see where the present notebook is located. You can either save that or delete it (this was needed only for the cloning) and you should see the "conference_planner" in the same directory, which has the code needed for this project.
+- At the top of the notebook, rename to to something like "Clone conference code.ipynb" and then select "Save" in the notebook's File menu. This will save a copy of the notebook that you created, into the default Colab directory. 
+You will want to keep this to pull any new version of the code, if the PO makes any revisions.
+In the event that you do need to pull a new copy of the code, then you'll have to manually delete your copy of "conference_planner" from Drive before rerunning the clone command.
 
-## Steps
+- Select "Locate on Drive" in the notebook's File menu, to see where the present notebook is located. You should see the "conference_planner" in the same directory, which has the code needed for this project.
+
+## Next steps for the Program Officer
 
 This code would aim to achieve the following steps, which are currently executed by the divisional program officers of SICB.
 
-1. [Download abstract data from X-CD](docs/download_upload.md).
+### Download abstract data from X-CD
+
+- Choose "Submissions overview" (left menu)
+- Click on blue "Submissions" button, which will send you to a "Manage Submissions" page.
+- Click on the red "Download" button.
+- Click on all three "Chk" buttons to select all fields for download
+- Scroll down and click on "Download Report" to download an xlsx file (starts with the word "abstracts").
+- Paste the xls file into the "data_2024" directory in the project root folder.
+
+
 <!-- 1. [Group abstracts into sessions of 6-8 talks](docs/session_making.md).
 1. [Scheduling:Assign each session to a date, time, and room.](docs/scheduling.md) -->
 <!-- 1. [Upload resulting schedule to the X-CD database.](docs/download_upload.md). -->
