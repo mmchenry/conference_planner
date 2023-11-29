@@ -99,8 +99,9 @@ The folder for your division should have the following files:
 
     - **talks.csv**: Simplified listing of the abstract and title on contributed talks
     - **posters.csv**: Similar listing for contributed posters
-    - **talks_ratings**: Values for the keyword ratings for talks.
-    - **posters_ratings**: Keyword ratings for the posters.
+    - **talks_ratings.csv**: Values for the keyword ratings for talks.
+    - **posters_ratings.csv**: Keyword ratings for the posters.
+    - **abstracts_revised.csv**: Copy of all abstracts for the meeting.
 
 - Launch [session_planner.ipynb](session_planner.ipynb) from the conference_planner folder in the "Colab Notebooks" folder on Drive.
 

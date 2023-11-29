@@ -446,8 +446,11 @@ def distribute_abstracts(data_root):
         saved_abs_counter += df_con.shape[0]
         saved_abs_counter += df_pstr.shape[0]
 
+        # Copy the full abstracts file to the division directory
+        df_raw.loc[ab_idx, columns_to_keep].to_csv(os.path.join(div_dir, ab_file[:-5] + '.csv'), index=False)
+
         # Report all files that were saved
-        print(f"    {division}: saved talks.csv, posters.csv.")
+        print(f"    {division}: saved abstracts_revised.csv talks.csv, posters.csv.")
     
     # Check if the total number of saved abstracts matches the original count
     if saved_abs_counter != num_abs:

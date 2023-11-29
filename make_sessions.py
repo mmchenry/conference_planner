@@ -374,7 +374,7 @@ def find_best_matches(group, df_dists, min_size, max_size):
     """
 
     # Number of random versions to try
-    n_rand = int(len(group))
+    n_rand = int(3*len(group))
 
     # Find combinations of numbers of talks that meet the size criteria
     session_num_sets = find_combinations(len(group), min_size, max_size)
@@ -460,32 +460,4 @@ def calculate_distances(ratings):
     return distance_df
 
 
-def load_abstracts(data_root, division, presentation_type='talks'):
-    """
-    Loads the abstracts for a given division and presentation type.
-    
-    Parameters:
-    - data_root (str): Path to the root directory containing the data.
-    - division (str): Name of the division.
-    - presentation_type (str): Type of presentation (talks or posters).
-    
-    Returns:
-    - df (DataFrame): DataFrame containing the abstracts.
-    """
-
-    # Adjust parameters and paths, depending on presentation type
-    if presentation_type == 'talks':
-        curr_in_dir = os.path.join(data_root, 'contributed_sessions')
-    elif presentation_type == 'posters':
-        curr_in_dir = os.path.join(data_root, 'poster_sessions')
-    else:
-        raise ValueError(f"Presentation type {presentation_type} not recognized.")
-    
-    # Current paths to the csv files
-    in_path = os.path.join(curr_in_dir, division + '.csv')
-
-    # read abstract data
-    df = pd.read_csv(in_path)
-
-    return df
 
