@@ -1,99 +1,47 @@
 # Conference Planner
 
-The is a set of tools for organizing a conference, developed for the annual meetings of the [Society for Integrative and Comparative Biology](https://sicb.org). 
-This can be adapted for other non-profit organizations, but was developed under a [license](LICENSE) that prohibits commercial use.
+The is a set of tools for organizing a conference, developed for the annual meetings of the [Society for Integrative and Comparative Biology](https://sicb.org). This can be adapted for other non-profit organizations, but was developed under a [license](LICENSE) that prohibits commercial use.
 
 ## Overview 
 
-The meeting organization is administered by the Program Officer (PO) at the level of the society and curated by the divisional program officers (DPOs). 
-The code in this repository therefore provides tools for both the PO and DPOs.
-To ease deployment, the code and instructions assume use of [Google's Colaboratory](https://colab.research.google.com) platform, which allows for the execution of Python code and uses [Google Drive](https://drive.google.com) to read and write files. 
-The Python code may alternatively be run on the local machines of the PO and/or DPOs by downloading this GitHub repository. 
+The meeting organization is administered by the Program Officer (PO) at the level of the society and curated by the divisional program officers (DPOs). The code in this repository therefore provides tools for both the PO and DPOs. To ease deployment, the code and instructions assume use of [Google's Colaboratory](https://colab.research.google.com) platform, which allows for the execution of Python code and uses [Google Drive](https://drive.google.com) to read and write files.  The Python code may alternatively be run locally by downloading this GitHub repository. 
 
-The present version of the code assumes that the abstracts submitted for the conference will be collected by [X-CD](https://www.x-cd.com), which is a vendor contracted by SICB.
-The only reason this matters is that the code assumes particular formatting for the data that is collected. 
-Any changes to this formatting will require alterations to the code.
-Conference Planner starts its work with an XLSX file of the submitted abstracts, provided by X-CD.
-The PO's initial work includes combing through the abstracts for duplicates and otherwise erroneous submissions. 
+The present version of the code assumes that the abstracts submitted for the conference will be collected by [X-CD](https://www.x-cd.com), which is a vendor contracted by SICB. The only reason this matters is that the code assumes particular formatting for the data that is collected. 
+Any changes to this formatting will require alterations to the code. Conference Planner starts its work with an XLSX file of the submitted abstracts, provided by X-CD. The PO's initial work includes combing through the abstracts for duplicates and otherwise erroneous submissions. 
 The PO will then distribute the contributed talks and posters to divisional directories, for which the DPOs should be granted access. 
 
-The PO's work includes running code that uses a large-language-model (currently GPT-4) to rate how keywords relate the the text of each abstract.
-This step is key to the success or failure of the whole project. 
-Prior to running the abstracts through GPT-4, the PO and DPOs might collaborate on the listing of keywords that are appropriate for each division. 
-These keywords should be of the type that typically differentiates sessions at the meeting.
-GPT-4 will be prompted to rate, on a scale from 0 to 1, how well each keyword relates to the abstract text for each presentation.
-This step uses the OpenAI API, which costs money (a total of around $50 for the 2024 program), and therefore would ideally be performed only once for each year's planning.
+The PO's work includes running code that uses a large-language-model (currently GPT-4) to rate how keywords relate the the text of each abstract. This step is key to the success or failure of the whole project. Prior to running the abstracts through GPT-4, the PO and DPOs might collaborate on the listing of keywords that are appropriate for each division. These keywords should be of the type that typically differentiates sessions at the meeting. GPT-4 will be prompted to rate, on a scale from 0 to 1, how well each keyword relates to the abstract text for each presentation. This step uses the OpenAI API, which costs money (a total of around $50 for the 2024 program), and therefore would ideally be performed only once for each year's planning.
 
-After the ratings are performed, the DPO's primary work begins.
-The formulation of sessions is performed in two rounds, both of which draw from GPT-4's keyword ratings.
-First, hierarchical clustering is performed to effectively determine the phylogenetic relationships between talks and to defined the major clades of talks.
-Next, the code tries numerous combinations of the presentations to find the most compatible grouping and sequencing.
-Although these steps are automated, the DPOs can adjust the weighting of keywords to determine which are most important for the creation of sessions.
-If the DPOs are unsatisfied with the code's results, then they can always resort to manually composing the sessions.
+After the ratings are performed, the DPO's primary work begins. The formulation of sessions is performed in two rounds, both of which draw from GPT-4's keyword ratings. First, hierarchical clustering is performed to effectively determine the phylogenetic relationships between talks and to defined the major clades of talks. Next, the code tries numerous combinations of the presentations to find the most compatible grouping and sequencing. Although these steps are automated, the DPOs can adjust the weighting of keywords to determine which are most important for the creation of sessions. If the DPOs are unsatisfied with the code's results, then they can always resort to manually composing the sessions.
 
-Once the sessions have been established, then the DPOs will determine the session chairs and room assignments with assistance from the code. However, These steps have yet to be coded in Conference Planner.
+Once the sessions have been established, then the DPOs will determine the session chairs and room assignments with assistance from the code. However, these steps have yet to be coded in Conference Planner.
 
 ## Setting up Google Colab
 
 - Both the POs and DPOs will need to have a [Google Colab account](https://colab.research.google.com), which requires a google account and use of [Google Drive](https://drive.google.com).
 
-- You will next want a copy of Conference Planner in your Colab account. This may be done by downloading the code:
+- You will next want a copy of Conference Planner in your Colab account. This may be done as follows:
     - [Download the present GitHub archive](https://github.com/mmchenry/conference_planner/archive/refs/heads/main.zip).
-    - Expand the zip archive and then copy the folder to Google Drive. 
-    - Note the path where you placed the folder in Drive.
+    - Expand the zip archive into a folder.
+    - Upload that folder to Google Drive. 
 
-- It's more involved, but you may [alternatively clone the repository directly from GitHub](clone_github.md).
+- As an alternative to these steps, but you may [clone the repository directly from GitHub](clone_github.md), but that process is more tedious and can be implemented later.
 
-- You now have access to the Python code needed for Conference Planner. 
-However, the data will be stored elsewhere on your Drive. 
-If you are a DPO, then you will first need the PO to grant you access to your divisional directory.
+- You now have access to the Python code needed for Conference Planner. However, the data will be stored elsewhere on your Drive. If you are a DPO, then you will first need the PO to grant you access to your divisional directory.
 
 - At the top of the notebook, rename it to something like "Clone conference planner.ipynb" and then select "Save" in the notebook's File menu. 
-This will save a copy of the notebook that you created into the default Colab directory. 
-You will want to keep this notebook to pull any new version of the code, if a new version of the repository becomes available.
-In the event that you do need to pull a new copy of the code, then you'll have to manually delete your copy of "conference_planner" from Drive before rerunning the notebook.
+This will save a copy of the notebook that you created into the default Colab directory. You will want to keep this notebook to pull any new version of the code, if a new version of the repository becomes available. In the event that you do need to pull a new copy of the code, then you'll have to manually delete your copy of "conference_planner" from Drive before rerunning the notebook.
 
 - Select "Locate on Drive" in the notebook's File menu, to see where the present notebook is located. 
 You should see the "conference_planner" folder in the same location, which has the code needed for this project.
 
-## Next steps for the Program Officer
+## Next steps 
 
-The SICB PO needs to initiate the creation of the meeting program with the following steps.
+Once set up on Google Colab, the workflow diverges between the PO and DPOs. Here are the next steps for each:
 
-### Download abstract data from X-CD
+- [[Program Officer Guide]]
+- [[Divisional Program Officer Guide]]
 
-- Browse to the X-CD web interface for the conference.
-- Choose "Submissions overview" (left menu)
-- Click on blue "Submissions" button, which will send you to a "Manage Submissions" page.
-- Click on the red "Download" button.
-- Click on all three "Chk" buttons to select all fields for download
-- Scroll down and click on "Download Report" to download an xlsx file (starts with the word "abstracts").
-
-### Setting up Google Drive
-
-- Navigate to your "Colabs Notebooks" folder on [Google Drive](https://drive.google.com).
-- Double-clicking on "meeting_planner.ipynb" (within the "conference_planner" folder) should launch that notebook in Google Colab.
-- In the first code cell of meeting_planner, you will want to set the root paths for your code and data on your Google Drive. 
-- Into the data_root folder, you will want to upload the abstracts file from X-CD and to specify the name of that file (without its extension) in the first cell of meeting_planner.
-- You will additionally want to upload [keywords.xlsx](https://github.com/mmchenry/conference_planner/blob/main/keywords.xlsx) to data_root. 
-keywords.xlsx is a spreadsheet that lists the keywords that will be used by GPT-4 to rate the abstracts. 
-A template for this file is included in the present repository and can be downloaded by clicking on this [link](https://github.com/mmchenry/conference_planner/blob/main/keywords.xlsx). 
-- Further instructions are offered in the text cells within [meeting_planner](meeting_planner.ipynb).
-
-## Next steps for the Divisional Program Officers
-
-- After setting up Google Colab with the Conference Planner code, you will need a directory on your Google Drive to work with the abstracts for your division. This directory should be share with you from the Program Officer.
-
-- You need to have edit permissions to your division folder (please do not rename this folder). 
-The folder for your division should have the following files: 
-
-    - **talks.csv**: Simplified listing of the abstract and title on contributed talks
-    - **posters.csv**: Similar listing for contributed posters
-    - **talks_ratings.csv**: Values for the keyword ratings for talks.
-    - **posters_ratings.csv**: Keyword ratings for the posters.
-    - **abstracts_revised.csv**: Copy of all abstracts for the meeting.
-
-- Launch [session_planner.ipynb](session_planner.ipynb) from the conference_planner folder in the "Colab Notebooks" folder on Drive.
 
 
 
