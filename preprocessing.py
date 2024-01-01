@@ -462,6 +462,76 @@ def distribute_abstracts(data_root):
     # output_path = os.path.join(data_root, ab_file[:-5] + '_after_distribution.xlsx')
     # df_raw.to_excel(output_path, index=False)
 
+def get_keywords(data_root, division):
+
+    # Load the keywords file
+    keywords_file_path = os.path.join(data_root, 'keywords.xlsx')
+    df_key = pd.read_excel(keywords_file_path)
+
+    # Extract and format major group keywords
+    major_group_keywords = df_key.loc[df_key['category'].str.lower() == 'major_groups', 'keywords'].iloc[0].split(', ')
+    major_group_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in major_group_keywords]
+
+    # Extract and format plant group keywords
+    plant_groups_keywords = df_key.loc[df_key['category'].str.lower() == 'plant_groups', 'keywords'].iloc[0].split(', ')
+    plant_groups_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in plant_groups_keywords]
+
+    # Extract and format plant group keywords
+    animal_groups_keywords = df_key.loc[df_key['category'].str.lower() == 'animal_groups', 'keywords'].iloc[0].split(', ')
+    animal_groups_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in animal_groups_keywords]
+
+    # Extract and format plant group keywords
+    biology_keywords = df_key.loc[df_key['category'].str.lower() == 'biology', 'keywords'].iloc[0].split(', ')
+    biology_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in biology_keywords]
+    
+    # Check if the division-specific row exists in df_key
+    division_row = df_key.loc[df_key['category'].str.lower() == division.lower(), 'keywords']
+    
+    if not division_row.empty:
+        # Extract and format division-specific keywords
+        division_keywords = division_row.iloc[0].split(', ')
+        division_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in division_keywords]
+        
+        # # Add columns for division-specific keywords
+        # for word in division_keywords:
+        #     if word not in df_div.columns:
+        #         df_div[word] = None
+    else:
+        raise ValueError(f"  Division '{division}' not found in keywords file.")
+
+    # Add plant group keywords for DOB
+    if division == 'dob':
+         major_group_keywords = major_group_keywords + plant_groups_keywords
+
+    # Otherwise, add animal group keywords (can modify for divisions that want both plants and animals)
+    if division != 'dob':
+        major_group_keywords = major_group_keywords + animal_groups_keywords
+
+    # Make list that combines major_group_keywords and biology_keywords
+    major_group_keywords = major_group_keywords + biology_keywords
+
+    # Add division-specific keywords to major_group_keywords
+    major_group_keywords = major_group_keywords + division_keywords
+
+    # Add plant group keywords for DOB
+    # if division == 'dob':
+    #     # Add columns to df_div for each word in plant_groups_keywords
+    #     for word in plant_groups_keywords:
+    #         df_div[word] = None
+
+    # # Otherwise, add animal group keywords
+    # else:
+    #     # Add columns to df_div for each word in animal_groups_keywords
+    #     for word in animal_groups_keywords:
+    #         df_div[word] = None
+
+    # # Add columns to df_div for each word in animal_groups_keywords
+    # for word in biology_keywords:
+    #     df_div[word] = None
+
+    return major_group_keywords
+    ttt=1
+
 
 def setup_ratings(data_root):
     """
@@ -485,14 +555,6 @@ def setup_ratings(data_root):
     # List of csv files to load
     csv_files = ['talks', 'posters']
 
-    # Load the keywords file
-    keywords_file_path = os.path.join(data_root, 'keywords.xlsx')
-    df_key = pd.read_excel(keywords_file_path)
-
-    # Extract and format major group keywords
-    major_group_keywords = df_key.loc[df_key['category'].str.lower() == 'major_groups', 'keywords'].iloc[0].split(', ')
-    major_group_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in major_group_keywords]
-
     # Loop through csv_files, load file
     for curr_csv in csv_files:
 
@@ -504,6 +566,9 @@ def setup_ratings(data_root):
                 division = 'dcb_dvm' 
             elif division == 'dvm':
                 continue            
+            
+            # Get keywords for the current division
+            keywords = get_keywords(data_root, division)
 
             # Current divisional paths
             in_path = os.path.join(data_root, div_dir_name, division, curr_csv + '.csv')
@@ -519,24 +584,9 @@ def setup_ratings(data_root):
             df_div['summary'] = None
             
             # Add columns to df_div for each word in major_group_keywords
-            for word in major_group_keywords:
+            for word in keywords:
                 df_div[word] = None
-
-            # Check if the division-specific row exists in df_key
-            division_row = df_key.loc[df_key['category'].str.lower() == division.lower(), 'keywords']
             
-            if not division_row.empty:
-                # Extract and format division-specific keywords
-                division_keywords = division_row.iloc[0].split(', ')
-                division_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in division_keywords]
-                
-                # Add columns for division-specific keywords
-                for word in division_keywords:
-                    if word not in df_div.columns:
-                        df_div[word] = None
-            else:
-                raise ValueError(f"  Division '{division}' not found in keywords file.")
-
             # Check if the file already exists
             if not os.path.exists(out_path):
                 # Save df_div to a csv file in a subdirectory for each division
@@ -546,6 +596,80 @@ def setup_ratings(data_root):
                 print(f"  {division} : {curr_csv}_ratings.csv already exists and will not be overwritten.")
 
     print("Ratings setup complete.")
+
+
+def setup_weights(data_root):
+    """
+    Create dataframes with columns for weighting keywords based on abstracts.
+
+    This function processes abstracts for different divisions, adding columns for specific keywords.
+    It checks for major group keywords and division-specific keywords from a provided keywords file,
+    then adds these as new columns to the abstract dataframes.
+
+    Parameters:
+    - data_root (str): The directory path where data files are stored.
+
+    Returns:
+    - None: The function saves the processed dataframes as CSV files.
+    """
+
+    print(' ')
+    print("Setting up divisional weights files ...")
+
+    # Load the keywords file
+    keywords_file_path = os.path.join(data_root, 'keywords.xlsx')
+    df_key = pd.read_excel(keywords_file_path)
+
+    # Loop through each division
+    for division in divisions_list:
+        
+        # Directory to save output files
+        if division == 'dcb':  
+            division = 'dcb_dvm' 
+        elif division == 'dvm':
+            continue      
+
+        # Get keywords for the current division
+        keywords = get_keywords(data_root, division)      
+
+        # Current divisional paths
+        out_path = os.path.join(data_root, div_dir_name, division, 'keyword_weights.csv')
+
+        # Create a dataframe with the columns 'keyword', 'weight_clustering'
+        df_div = pd.DataFrame({'keyword': keywords, 'weight_clustering': [1] * len(keywords),
+                              'weight_sequencing': [1] * len(keywords)})
+
+        # Add keyword list
+        # df_div = pd.concat([df_div, keywords], ignore_index=True)
+
+        # # Check if the division-specific row exists in df_key
+        # division_row = df_key.loc[df_key['category'].str.lower() == division.lower(), 'keywords']
+        
+        # if not division_row.empty:
+        #     # Extract and format division-specific keywords
+        #     division_keywords = division_row.iloc[0].split(', ')
+        #     division_keywords = [word.strip().replace(' ', '_').replace('-', '_').lower() for word in division_keywords]
+
+        #     # Create a DataFrame for new keywords
+        #     new_keywords_df = pd.DataFrame({'keyword': division_keywords, 'weight': [1] * len(division_keywords)})
+
+        #     # Concatenate the new DataFrame with df_div
+        #     df_div = pd.concat([df_div, new_keywords_df], ignore_index=True)
+            
+        # else:
+        #     raise ValueError(f"  Division '{division}' not found in keywords file.")
+
+        out_path = os.path.join(data_root, div_dir_name, division, 'keyword_weights.xlsx')
+
+        # Check if the file already exists
+        if not os.path.exists(out_path):
+            # Save df_div to a csv file in a subdirectory for each division
+            df_div.to_excel(out_path, index=False)
+            print(f"  {division}: Saved {out_path}")
+        else:
+            print(f"  {division}: {out_path} already exists and will not be overwritten.")
+
+    print("Weights setup complete.")
 
 
 def create_keyword_xlsx(inter_data_dir):

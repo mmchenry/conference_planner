@@ -8,18 +8,18 @@ This can be adapted for other non-profit organizations, but was developed under 
 The meeting organization is administered by the Program Officer (PO) at the level of the society and curated by the divisional program officers (DPOs). 
 The code in this repository therefore provides tools for both the PO and DPOs.
 To ease deployment, the code and instructions assume use of [Google's Colaboratory](https://colab.research.google.com) platform, which allows for the execution of Python code and uses [Google Drive](https://drive.google.com) to read and write files. 
-The Python code may alternatively be run on the local machines of the PO and/or DPOs. 
+The Python code may alternatively be run on the local machines of the PO and/or DPOs by downloading this GitHub repository. 
 
 The present version of the code assumes that the abstracts submitted for the conference will be collected by [X-CD](https://www.x-cd.com), which is a vendor contracted by SICB.
-The only reason this matters is that the code assume particular formatting for the data that is collected. 
+The only reason this matters is that the code assumes particular formatting for the data that is collected. 
 Any changes to this formatting will require alterations to the code.
 Conference Planner starts its work with an XLSX file of the submitted abstracts, provided by X-CD.
 The PO's initial work includes combing through the abstracts for duplicates and otherwise erroneous submissions. 
 The PO will then distribute the contributed talks and posters to divisional directories, for which the DPOs should be granted access. 
 
-The PO's work includes running code that used GPT-4 to rate how keywords relate the the text of each abstract.
+The PO's work includes running code that uses a large-language-model (currently GPT-4) to rate how keywords relate the the text of each abstract.
 This step is key to the success or failure of the whole project. 
-Prior to using GPT-4, the PO and DPOs might collaborate on the listing of keywords that are appropriate for each division. 
+Prior to running the abstracts through GPT-4, the PO and DPOs might collaborate on the listing of keywords that are appropriate for each division. 
 These keywords should be of the type that typically differentiates sessions at the meeting.
 GPT-4 will be prompted to rate, on a scale from 0 to 1, how well each keyword relates to the abstract text for each presentation.
 This step uses the OpenAI API, which costs money (a total of around $50 for the 2024 program), and therefore would ideally be performed only once for each year's planning.
@@ -27,32 +27,22 @@ This step uses the OpenAI API, which costs money (a total of around $50 for the 
 After the ratings are performed, the DPO's primary work begins.
 The formulation of sessions is performed in two rounds, both of which draw from GPT-4's keyword ratings.
 First, hierarchical clustering is performed to effectively determine the phylogenetic relationships between talks and to defined the major clades of talks.
-Next, the code tries numerous combinations of the presentations to find the most their most compatible grouping and sequencing.
-Although this steps are automated, the DPOs can adjust the weighting of keywords to determine which are most important for the creation of sessions.
+Next, the code tries numerous combinations of the presentations to find the most compatible grouping and sequencing.
+Although these steps are automated, the DPOs can adjust the weighting of keywords to determine which are most important for the creation of sessions.
 If the DPOs are unsatisfied with the code's results, then they can always resort to manually composing the sessions.
 
-Once the sessions have been established, then the DPOs will determine the session chairs and room assignments. These steps have yet to be coded in Conference Planner.
+Once the sessions have been established, then the DPOs will determine the session chairs and room assignments with assistance from the code. However, These steps have yet to be coded in Conference Planner.
 
 ## Setting up Google Colab
 
 - Both the POs and DPOs will need to have a [Google Colab account](https://colab.research.google.com), which requires a google account and use of [Google Drive](https://drive.google.com).
 
-- Login to [Colab](https://colab.research.google.com) and create a new notebook. This may appear as a button on a dialog box when you navigate to the Colab site, you or can do this by selecting "New notebook" under the file menu within the notebook.
+- You will next want a copy of Conference Planner in your Colab account. This may be done by downloading the code:
+    - [Download the present GitHub archive](https://github.com/mmchenry/conference_planner/archive/refs/heads/main.zip).
+    - Expand the zip archive and then copy the folder to Google Drive. 
+    - Note the path where you placed the folder in Drive.
 
-- Your new notebook will launch with a code cell selected. Paste the following lines into this cell:
-    > from google.colab import drive \
-    import os \
-    drive.mount('/content/drive')
-    
-    and click on the right-pointing arrow on the left side of the cell to execute the cell.
-    When prompted, select "Connect to Google Drive" and then grant permission to allow Colab to access to Drive.
-
-- You will next want a copy of Conference Planner in your Colab account, which is accomplished by cloning from its Github repository. Click on the "+ Code" button on the top-left of the notebook to create a new cell and then paste and execute the following (Note that you may need to adjust the path address if your Colab notebooks are not in the default location on Drive):
-    > os.chdir('/content/drive/MyDrive/Colab Notebooks/') \
-    ! git clone https://github.com/mmchenry/conference_planner.git
-
-    If the clone worked, then you should get a response that ends like this:
-    > Receiving objects: 100% (7/7), 8.21 KiB | 1.64 MiB/s, done.
+- It's more involved, but you may [alternatively clone the repository directly from GitHub](clone_github.md).
 
 - You now have access to the Python code needed for Conference Planner. 
 However, the data will be stored elsewhere on your Drive. 

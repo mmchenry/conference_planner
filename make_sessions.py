@@ -11,19 +11,63 @@ import string
 
 
 
-def extract_ratings(df):
+def extract_ratings(df, df_weights, analysis_step='clustering', include_id=False):
     """
-    Extracts the ratings from the DataFrame and returns a new DataFrame with only the ratings.
+    Extracts the ratings from the DataFrame and returns a new DataFrame with weighted ratings.
+    Throws an error if a keyword in df does not have a corresponding weight in df_weights.
+    Parameters:
+    - df (DataFrame): DataFrame containing the abstracts and ratings.
+    - df_weights (DataFrame): DataFrame containing the weights for each keyword.
+    Returns:
+    - df_ratings (DataFrame): DataFrame containing the weighted ratings.
     """
     # Columns to exclude from the ratings
-    non_keyword_columns = ['id', 'clean_title', 'clean_abstract', 'summary','session_num','talk_num','major_branch','session_branch']
+    non_keyword_columns = ['id', 'clean_title', 'clean_abstract', 'summary', 'session_num', 'talk_num', 'major_branch', 'session_branch']
 
-     # Extract keywords from the dataframe, by excluding other columns
+    # Extract keywords from the dataframe, by excluding other columns
     keywords = [col for col in df.columns if col not in non_keyword_columns]
 
+    # Convert keyword columns to numeric and fill NaNs with 0
     df_ratings = df[keywords].apply(pd.to_numeric).fillna(0)
 
+    # Apply weights to the ratings and check for unmatched keywords
+    for keyword in keywords:
+        if keyword in df_weights['keyword'].values:
+            
+            # For hierarchical clustering 
+            if analysis_step == 'clustering':
+                weight = df_weights.loc[df_weights['keyword'] == keyword, 'weight_clustering'].iloc[0]
+
+            # For sequencing
+            elif analysis_step == 'sequencing':
+                weight = df_weights.loc[df_weights['keyword'] == keyword, 'weight_sequencing'].iloc[0]
+
+            else:
+                raise ValueError(f"Invalid analysis_step: {analysis_step}")
+            
+            # Multiply the ratings by the weight
+            df_ratings[keyword] *= weight
+            
+            # For sequencing, exclude keywords where all clustering weights are zero
+            # if analysis_step == 'sequencing' and df_weights[df_weights['keyword'] == keyword]['weight_clustering'].any():
+            #     df_ratings.drop(columns=[keyword], inplace=True)
+
+        else:
+            raise ValueError(f"Keyword '{keyword}' in df does not have a corresponding weight in df_weights.")
+
+    # Remove all columns where every row is zero from ratings
+    df_ratings = df_ratings.loc[:, (df_ratings != 0).any(axis=0)]
+
+    # Replace zeros with NaNs and fill NaNs with the mean of each column
+    df_ratings.replace(0, np.nan).fillna(df_ratings.mean())
+
+    # Add the id column to the ratings DataFrame
+    if include_id:
+        df_ratings['id'] = df['id']
+
     return df_ratings
+
+
 
 
 def find_combinations(target_sum, min_value=6, max_value=8):
@@ -73,14 +117,13 @@ def find_combinations(target_sum, min_value=6, max_value=8):
     return results
 
 
-def fuse_clusters(df, min_size, max_size):
+def fuse_clusters(df, min_size):
     """
     Fuses clusters that are intermediate in size.
     
     Parameters:
     - df (DataFrame): DataFrame containing the abstracts and ratings.
     - min_size (int): Minimum number of abstracts per session.
-    - max_size (int): Maximum number of abstracts per session.
     
     Returns:
     - df (DataFrame): DataFrame containing the abstracts and ratings, with cluster_num column added.
@@ -99,7 +142,8 @@ def fuse_clusters(df, min_size, max_size):
         branch_counts = branch_counts.sort_index()
 
         # Identify branches that need to be fused
-        branches_to_fuse = branch_counts[(branch_counts > max_size) & (branch_counts < min_size + max_size)]
+        # branches_to_fuse = branch_counts[(branch_counts > max_size) & (branch_counts < min_size + max_size)]
+        branches_to_fuse = branch_counts[branch_counts < min_size]
         
         # If no branches need fusing, exit the loop
         if branches_to_fuse.empty:
@@ -139,12 +183,15 @@ def fuse_clusters(df, min_size, max_size):
     return df
 
 
-def summarize_branch_keywords(df, num_keywords=5, echo=True):
+import pandas as pd
+
+def summarize_branch_keywords(df, df_weights, num_keywords=5, echo=True):
     """
-    Summarizes the keywords for each major branch.
+    Summarizes the keywords for each major branch, including the mean value for each keyword.
     
     Parameters:
     - df (DataFrame): DataFrame containing the abstracts and ratings.
+    - df_weights (DataFrame): DataFrame containing weights for analysis.
     - num_keywords (int): Number of keywords to include in the summary.
     
     Returns:
@@ -152,7 +199,7 @@ def summarize_branch_keywords(df, num_keywords=5, echo=True):
     """
 
     # Extract ratings to get keyword columns
-    ratings = extract_ratings(df)
+    ratings = extract_ratings(df, df_weights, analysis_step='clustering')
     keywords_columns = ratings.columns
 
     # Initialize an empty DataFrame to store branch summaries
@@ -167,7 +214,8 @@ def summarize_branch_keywords(df, num_keywords=5, echo=True):
     # Iterate over each branch
     for branch, data in branch_means.iterrows():
         # Sort keywords by mean rating and select top N
-        top_keywords = data.sort_values(ascending=False).head(num_keywords).index.tolist()
+        top_keywords_data = data.sort_values(ascending=False).head(num_keywords)
+        top_keywords = [f"{kw} ({mean_val:.2f})" for kw, mean_val in top_keywords_data.items()]
         talk_count = branch_counts[branch]
 
         # Create a DataFrame for the current branch summary
@@ -184,15 +232,14 @@ def summarize_branch_keywords(df, num_keywords=5, echo=True):
     return branch_summ
 
 
-def run_hierarchical(df, min_size=6, max_size=8):
+def run_hierarchical(df, df_weights, min_size=16):
     """
     Runs hierarchical clustering on the DataFrame until some sessions are found in desired range of sizes.
 
     Parameters:
     - df (DataFrame): DataFrame containing the abstracts and ratings.
-    - min_size (int): Minimum number of abstracts per session.
-    - max_size (int): Maximum number of abstracts per session.
-    - branch_type (str): Type of branch to use for clustering ('major_branch' or 'session_branch').
+    - min_size (int): Minimum number of abstracts per major branch.
+    - max_size (int): Maximum number of abstracts per major branch.
 
     Returns:
     - df (DataFrame): DataFrame containing the abstracts and ratings, with major_branch column added.
@@ -216,10 +263,9 @@ def run_hierarchical(df, min_size=6, max_size=8):
 
     # Loop until a valid number of clusters is found
     while distance_threshold<max_distance:
-
         try:        
             # Run hierarchical clustering
-            df = hierarchical_clustering(df, distance_threshold=distance_threshold, display_dendrogram=False)
+            df = hierarchical_clustering(df, df_weights, distance_threshold=distance_threshold, display_dendrogram=False)
 
             # Get the count of talks in each branch
             num_talks = df['major_branch'].value_counts()
@@ -242,14 +288,12 @@ def run_hierarchical(df, min_size=6, max_size=8):
     # If the hierarchical clustering worked
     else:
         # Fuse clusters, if necessary
-        df = fuse_clusters(df, min_size, max_size)
+        df = fuse_clusters(df, min_size)
 
     return df, distance_threshold
 
 
-
-
-def hierarchical_clustering(df, distance_threshold, display_dendrogram=False):
+def hierarchical_clustering(df, df_weights, distance_threshold, display_dendrogram=False):
     """
     Performs hierarchical clustering on the DataFrame and returns the DataFrame with a column for the major branch.
 
@@ -264,7 +308,7 @@ def hierarchical_clustering(df, distance_threshold, display_dendrogram=False):
     """
 
     # Extract ratings
-    ratings = extract_ratings(df)
+    ratings = extract_ratings(df, df_weights, analysis_step='clustering')
 
     # Perform hierarchical clustering
     Z = hierarchy.linkage(ratings, method='ward')
@@ -286,7 +330,7 @@ def hierarchical_clustering(df, distance_threshold, display_dendrogram=False):
     return df
 
 
-def plot_dendrogram(df, distance_threshold):
+def plot_dendrogram(df, df_weights, distance_threshold):
     """
     Plots the dendrogram for the hierarchical clustering.
     
@@ -296,7 +340,7 @@ def plot_dendrogram(df, distance_threshold):
     """
 
     # Extract ratings
-    ratings = extract_ratings(df)
+    ratings = extract_ratings(df, df_weights, analysis_step='clustering')
 
     # Perform hierarchical clustering
     Z = hierarchy.linkage(ratings, method='ward')
@@ -308,7 +352,7 @@ def plot_dendrogram(df, distance_threshold):
     plt.show()
 
 
-def process_each_branch(df, min_size=6, max_size=8, echo=False):
+def process_each_branch(df, df_weights, min_size=6, max_size=8, echo=False):
     """
     Processes each major branch to sequentially create sessions based on talk proximity.
 
@@ -339,7 +383,7 @@ def process_each_branch(df, min_size=6, max_size=8, echo=False):
         num_talks = len(group)
 
         # Find distances between talks
-        df_dists = calculate_distances(extract_ratings(group))
+        df_dists = calculate_distances(extract_ratings(group, df_weights, analysis_step='sequencing'))
             
         # Indicies for set of sessions with closest distances
         set_idx = find_best_matches(group, df_dists, min_size, max_size)
@@ -374,7 +418,7 @@ def find_best_matches(group, df_dists, min_size, max_size):
     """
 
     # Number of random versions to try
-    n_rand = int(3*len(group))
+    n_rand = int(2*len(group))
 
     # Find combinations of numbers of talks that meet the size criteria
     session_num_sets = find_combinations(len(group), min_size, max_size)
@@ -444,6 +488,9 @@ def calculate_distances(ratings):
     Returns:
     - DataFrame: A pandas DataFrame representing the pairwise Euclidean distances.
     """
+
+    
+
     # Compute pairwise distances
     distances = pdist(ratings, metric='euclidean')
     
