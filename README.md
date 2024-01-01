@@ -39,8 +39,9 @@ You should see the "conference_planner" folder in the same location, which has t
 
 Once set up on Google Colab, the workflow diverges between the PO and DPOs. Here are the next steps for each:
 
-- [[Program Officer Guide]]
-- [[Divisional Program Officer Guide]]
+- [Program Officer Guide](Program%20Officer%20Guide.md)
+- [Divisional Program Officer Guide](Divisional%20Program%20Officer%20Guide.md)
+
 
 
 
