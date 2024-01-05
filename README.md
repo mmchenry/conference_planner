@@ -29,18 +29,17 @@ Once the sessions have been established, then the DPOs will determine the sessio
 
 - You now have access to the Python code needed for Conference Planner. However, the data will be stored elsewhere on your Drive. If you are a DPO, then you will first need the PO to grant you access to your divisional directory.
 
-- At the top of the notebook, rename it to something like "Clone conference planner.ipynb" and then select "Save" in the notebook's File menu. 
-This will save a copy of the notebook that you created into the default Colab directory. You will want to keep this notebook to pull any new version of the code, if a new version of the repository becomes available. In the event that you do need to pull a new copy of the code, then you'll have to manually delete your copy of "conference_planner" from Drive before rerunning the notebook.
+- At the top of the notebook, rename it to something like "Clone conference planner.ipynb" and then select "Save" in the notebook's File menu. This will save a copy of the notebook that you created into the default Colab directory. You will want to keep this notebook to pull any new version of the code, if a new version of the repository becomes available. In the event that you do need to pull a new copy of the code, then you'll have to manually delete your copy of "conference_planner" from Drive before rerunning the notebook.
 
-- Select "Locate on Drive" in the notebook's File menu, to see where the present notebook is located. 
-You should see the "conference_planner" folder in the same location, which has the code needed for this project.
+- Select "Locate on Drive" in the notebook's File menu, to see where the present notebook is located. You should see the "conference_planner" folder in the same location, which has the code needed for this project.
+
 
 ## Next steps 
 
 Once set up on Google Colab, the workflow diverges between the PO and DPOs. Here are the next steps for each:
 
-- [Program Officer Guide](Program%20Officer%20Guide.md)
-- [Divisional Program Officer Guide](Divisional%20Program%20Officer%20Guide.md)
+- [Program_Officer_Guide](Program_Officer_Guide.md)
+- [Divisional_Program_Officer_Guide](Divisional_Program_Officer_Guide.md)
 
 
 
