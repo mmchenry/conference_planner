@@ -58,21 +58,22 @@ def setup_directories(data_root, abstract_filename):
         warnings.warn(f'Keywords file does not exist: {kw_file}')
 
     # Create directory for non-divisional files
-    nondiv_dir = os.path.join(data_root, 'non-division')
-    if not os.path.exists(nondiv_dir):
-        os.makedirs(nondiv_dir)
-        print(f'Created directory {nondiv_dir}')
+    special_dir = os.path.join(data_root, 'special')
+    if not os.path.exists(special_dir):
+        os.makedirs(special_dir)
+        print(f'Created directory {special_dir}')
+
+    # Create directory for contributed talks
+    cont_dir = os.path.join(data_root, 'contributed')
+    if not os.path.exists(cont_dir):
+        os.makedirs(cont_dir)
+        print(f'Created directory {cont_dir}')
 
     # Loop thru each division
     for division in divisions_list:
 
         # Fuse dcb and dvm into one directory
-        if division == 'dcb' or division == 'dvm':
-            currdir = os.path.join(data_root, div_dir_name, 'dcb_dvm')
-        
-        # Otherwise, use the division name
-        else:
-            currdir = os.path.join(data_root, div_dir_name, division)
+        currdir = os.path.join(data_root, div_dir_name, division)
 
         # Make directory if it doesn't exist
         if not os.path.exists(currdir):
@@ -80,18 +81,17 @@ def setup_directories(data_root, abstract_filename):
             print(f'Created directory {currdir}')
 
 
-def flag_duplicates(data_root):
+def flag_duplicates(data_root, echo_text=False):
     """
     Function to flag abstracts that should be excluded from analysis.
 
     Parameters:
-    - source_data_dir (str): Root directory of data.
-    - mtg_year (int): Year of the meeting for which the abstracts are collected.
-    - abstract_filename (str): Name of the Excel file containing the abstracts.
+    - data_root (str): Root directory of data.
+    - echo_text (logical): Whether to report flagged abstracts via text
 
     Output:
-    - Saves an Excel file with a new column 'exclude' that is 1 for abstracts that should be excluded.
-    - Saves an Excel file with a list of duplicate abstracts.
+    - Saves an updated version of the ab_file with a new column 'exclude' that is 1 for abstracts that should be excluded.
+    - Saves a new Excel file with a list of duplicate abstracts.
     """
     
     # Define file paths
@@ -108,8 +108,9 @@ def flag_duplicates(data_root):
     df_raw['exclude'] = 0
     df_raw['exclusion_note'] = ''
 
-    print(' ')
-    print('DUPLICATE TITLES AND ID NUMBERS -------------- ')
+    if echo_text:
+        print(' ')
+        print('DUPLICATE TITLES AND ID NUMBERS -------------- ')
 
     # Find duplicate IDs and Titles
     duplicate_ids = df_raw[df_raw.duplicated(subset='id', keep=False)]
@@ -126,9 +127,10 @@ def flag_duplicates(data_root):
 
         if group['title'].nunique() > 1:
             df_raw.loc[group.index, 'exclusion_note'] = 'duplicate id'
-            print(f"ID {id} has multiple titles:")
-            for title in group['title'].unique().tolist():
-                print(f"   {title}")
+            if echo_text:
+                print(f"ID {id} has multiple titles:")
+                for title in group['title'].unique().tolist():
+                    print(f"   {title}")
 
     # Handle cases with duplicate Titles
     for AbTitle, group in duplicate_titles.groupby('title'):
@@ -139,9 +141,10 @@ def flag_duplicates(data_root):
         # If there is more than one ID
         if group['id'].nunique() > 1:
             df_raw.loc[group.index, 'exclusion_note'] = 'duplicate title'
-            print(f"Multiple IDs with same title: {AbTitle}")
-            for id_val in group['id'].unique().tolist():
-                print(f"   {id_val}")
+            if echo_text:
+                print(f"Multiple IDs with same title: {AbTitle}")
+                for id_val in group['id'].unique().tolist():
+                    print(f"   {id_val}")
 
         # If there is only one ID
         else:
@@ -161,8 +164,8 @@ def flag_duplicates(data_root):
     cols.remove('exclusion_note')
     df_dup = df_dup[cols]
 
-
-    print(' ')
+    if echo_text:
+        print(' ')
 
     # Save processed dataframes, only if the file does not exist
     df_raw.to_excel(output_path, index=False)
@@ -171,14 +174,16 @@ def flag_duplicates(data_root):
     print(f"Saved listing of duplicates: {duplicates_path}")
 
 
-def find_duplicate_authors(data_root):
+def find_duplicate_authors(data_root, echo_text=False):
     """
     Function to find duplicate "Primary Contact - ContactID" under specific conditions.
 
-    Parameters:
-    source_data_dir (str): Root directory of data.
-    mtg_year (int): Year of the meeting for which the abstracts are collected.
-    inclusive_abstract_filename (str): Name of the Excel file to read from.
+    Input:
+    data_root (str): Root directory of data.
+    echo_text (bool): Whether to report results as text
+
+    Output:
+    Saves a new Excel file with a list of duplicate authors.
     """
     
     # Define file paths
@@ -202,16 +207,18 @@ def find_duplicate_authors(data_root):
     # Find duplicate "Primary Contact - ContactID"
     duplicate_contact_ids = df_filtered[df_filtered.duplicated(subset='Primary Contact - ContactID', keep=False)]
 
-    print(' ')
-    print('DUPLICATE AUTHORS --------------------- ')
+    if echo_text:
+        print(' ')  
+        print('DUPLICATE AUTHORS --------------------- ')
 
     # Print information for each duplicate case
     for contact_id, group in duplicate_contact_ids.groupby('Primary Contact - ContactID'):
         types_count = group['Session Type'].value_counts()
         if len(types_count) > 1:
-            print(f"Duplicate 'ContactID': {contact_id}")
-            for idx, row in group.iterrows():
-                print(f"   ID: {row['id']}, Session Type: {row['Session Type']}")
+            if echo_text:
+                print(f"Duplicate 'ContactID': {contact_id}")
+                for idx, row in group.iterrows():
+                    print(f"   ID: {row['id']}, Session Type: {row['Session Type']}")
 
     duplicate_contact_ids.to_excel(output_path, index=False)
     print(f"Saved duplicate primary contact: {output_path}")
@@ -267,10 +274,16 @@ def clean_abstracts(df):
 
 def process_abstracts(data_root, abstract_filename):
     """
-    Extract division and topic information from abstracts and save updated abstracts file.
+    Extract division and topic information from abstracts and add them to an updated abstracts file.
+    Input:
+        - data_root: Path to root directory of data
+        - abstract_filename: Name of the Excel file containing the abstracts
+
+    Output:
+        - Saves an Excel file with updated abstracts
     """
 
-    # dict of column names from df_raw to rename to other dataframes
+    # dict of column names from df to rename to other dataframes
     col_dict = {'ID':'id', 
                 'AbTitle': 'title',
                 'Abstract':'abstract',
@@ -283,13 +296,13 @@ def process_abstracts(data_root, abstract_filename):
     # Read Excel file into a Pandas DataFrame
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=UserWarning)
-        df_raw = pd.read_excel(input_file) 
+        df = pd.read_excel(input_file) 
 
     # Generate clean abstracts and titles
-    df_raw = clean_abstracts(df_raw)
+    df = clean_abstracts(df)
 
-    # Rename the columns of df_raw
-    df_raw.rename(columns=col_dict, inplace=True)
+    # Rename the columns of df
+    df.rename(columns=col_dict, inplace=True)
 
     # Define a function to extract the division for the abstract
     def div_directory(row):
@@ -300,22 +313,19 @@ def process_abstracts(data_root, abstract_filename):
             div_dir = "edu"
         elif '-' in text:
             div_text = text.split('-')[0].strip().lower()
-            if div_text=='dvm' or div_text=='dcb':
-                div_dir = 'dcb_dvm'
-            else:
-                div_dir = div_text
+            div_dir = div_text
         else:
             div_dir = None
         
         return div_dir
 
     # Define divisional affiliation for each abstract
-    df_raw['ab_division'] = df_raw.apply(div_directory, axis=1)
+    df['ab_division'] = df.apply(div_directory, axis=1)
 
     # List of columns starting with "Select Topic:"
-    topic_columns = [col for col in df_raw.columns if col.startswith("Select Topic:")]
+    topic_columns = [col for col in df.columns if col.startswith("Select Topic:")]
 
-    # Define a function to extract text after the dash or colon
+    # Define a function to extract text after the dash or colon in the "Select Topic" column 
     def extract_topic(row):
         topic_found = False  # Flag to check if a topic was found in any column
         for col in topic_columns:
@@ -330,16 +340,199 @@ def process_abstracts(data_root, abstract_filename):
             return "none"  # Default value when no topic is found in any column
         
     # Apply the function to create the 'topic' column
-    df_raw['topic'] = df_raw.apply(extract_topic, axis=1)
+    df['topic'] = df.apply(extract_topic, axis=1)
 
-    #  Save updated df_raw file
+    #  Save updated df file
     output_path = os.path.join(data_root, ab_file)
-    df_raw.to_excel(output_path, index=False)
+    df.to_excel(output_path, index=False)
     print(f"Saved updated abstracts file: {output_path}")
 
 
 
 def distribute_abstracts(data_root):
+    """
+    This function loads the abstract data from an xlsx file, extracts division and topic information, and saves abstracts into separate csv files.
+    Input:
+        - data_root: Path to root directory of data
+
+    Output:
+        - Saves csv files for each division and session type
+    """
+
+    print('Distributing abstracts to CSV files:')
+
+    # Columns to include in output dataframe
+    columns_to_keep = ["id", "title", "abstract", "clean_abstract", "clean_title", "ab_division", "topic"]
+
+    # Path to abstract file
+    input_file = os.path.join(data_root, ab_file)
+
+    # Read Excel file into a Pandas DataFrame
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        df_raw = pd.read_excel(input_file)   
+
+    # Include only rows where exclude==0
+    df_raw = df_raw[df_raw['exclude'] == 0]
+
+    # Accounting for exported abstracts
+    df_raw['exported_to_csv'] = 0
+
+    # Count number of abstracts
+    num_abs = df_raw.shape[0]
+
+    # Initialize a counter for saved abstracts
+    saved_abs_counter = 0
+
+    # Create dataframes for non-divisional sessions
+    df_special = df_raw.loc[df_raw['Session Type'] == 
+                            'Special Session', columns_to_keep]
+    df_none = df_raw.loc[pd.isna(df_raw['Session Type']), columns_to_keep]
+    df_sym = df_raw.loc[df_raw['Session Type'] == 
+                            'Symposia and complementary sessions', columns_to_keep]
+    
+    # These versions retain all columns
+    df_raw_special = df_raw.loc[df_raw['Session Type'] == 'Special Session', :]
+    df_raw_none = df_raw.loc[pd.isna(df_raw['Session Type']), :]
+    df_raw_sym = df_raw.loc[df_raw['Session Type'] == 'Symposia and complementary sessions', :]
+
+    # Reindex the DataFrames
+    df_special.reset_index(drop=True, inplace=True)
+    df_sym.reset_index(drop=True, inplace=True)
+    df_none.reset_index(drop=True, inplace=True)
+    df_raw_special.reset_index(drop=True, inplace=True)
+    df_raw_sym.reset_index(drop=True, inplace=True)
+    df_raw_none.reset_index(drop=True, inplace=True)
+
+    # Save non-divisional 'special' dataframe to CSV and excel files
+    special_dir = os.path.join(data_root, 'special')
+    fname = 'special.csv'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_special.to_csv(os.path.join(special_dir, fname), index=False)
+        df_raw.loc[df_raw['Session Type'] == 'Special Session', 'exported_to_csv'] = 1
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, 'special.csv')}")
+
+    fname = 'abstracts_special.xlsx'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_raw_special.to_excel(os.path.join(special_dir, fname), index=False)    
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, fname)}")
+
+    # Save non-divisional 'none' dataframe to CSV and excel files
+    fname = 'none.csv'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_none.to_csv(os.path.join(special_dir, fname), index=False)
+        df_raw.loc[pd.isna(df_raw['Session Type']), 'exported_to_csv'] = 1
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, 'none.csv')}")
+
+    fname = 'abstracts_none.xlsx'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_raw_none.to_excel(os.path.join(special_dir, fname), index=False)    
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, fname)}")
+
+    # Save non-divisional 'symposia' dataframe to CSV and excel files
+    fname = 'symposia.csv'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_sym.to_csv(os.path.join(special_dir, fname), index=False)
+        df_raw.loc[df_raw['Session Type'] == 'Symposia and complementary sessions', 'exported_to_csv'] = 1
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, 'symposia.csv')}")    
+    
+    fname = 'abstracts_symposia.xlsx'
+    if not os.path.exists(os.path.join(special_dir, fname)):
+        df_raw_sym.to_excel(os.path.join(special_dir, fname), index=False)    
+        print(f"  Saved {fname} to {special_dir}")
+    else:
+        print(f"  File already exists: {os.path.join(special_dir, fname)}")
+
+    # Update saved_abs_counter after saving each DataFrame
+    saved_abs_counter += df_special.shape[0]
+    saved_abs_counter += df_none.shape[0]
+    saved_abs_counter += df_sym.shape[0]
+
+    # Output directory
+    cont_dir = os.path.join(data_root, 'contributed')
+
+    # Filter rows where 'Session Type' is 'Contributed Talk Presentations' and keep only specified columns
+    df_con = df_raw.loc[(df_raw['Session Type'] == 
+                        'Contributed Talk Presentations'), columns_to_keep]
+    df_pstr = df_raw.loc[(df_raw['Session Type'] == 
+                        'Contributed Poster Presentations'), columns_to_keep]
+
+    # Filter rows where 'Session Type' is 'Contributed Talk Presentations' and keep all columns
+    df_raw_con = df_raw.loc[(df_raw['Session Type'] == 
+                        'Contributed Talk Presentations'), :]
+    df_raw_pstr = df_raw.loc[(df_raw['Session Type'] == 
+                        'Contributed Poster Presentations'), :]
+    
+    # Reindex the DataFrames
+    df_con.reset_index(drop=True, inplace=True)
+    df_pstr.reset_index(drop=True, inplace=True)
+    df_raw_con.reset_index(drop=True, inplace=True)
+    df_raw_pstr.reset_index(drop=True, inplace=True)
+
+    # Save each DataFrame of contributed talks to a CSV and xlsx files
+    fname = 'talks.csv'
+    if not os.path.exists(os.path.join(cont_dir, fname)):
+        df_con.to_csv(os.path.join(cont_dir, fname), index=False)
+        df_raw.loc[(df_raw['Session Type'] == 'Contributed Talk Presentations'), 'exported_to_csv'] = 1
+        print(f"  Saved {fname} to {os.path.join(cont_dir, fname)}")
+    else:
+        print(f"  File already exists: {os.path.join(cont_dir, fname)}") 
+
+    fname = 'abstracts_talks.xlsx'
+    if not os.path.exists(os.path.join(cont_dir, fname)):
+        df_raw_con.to_excel(os.path.join(cont_dir, fname), index=False)
+        print(f"  Saved {fname} to {os.path.join(cont_dir, fname)}")
+    else:
+        print(f"  File already exists: {os.path.join(cont_dir, fname)}") 
+    
+    # Save each DataFrame of contributed posters to a CSV and xlsx files
+    fname = 'posters.csv'
+    if not os.path.exists(os.path.join(cont_dir, fname)):
+        df_pstr.to_csv(os.path.join(cont_dir, fname), index=False)  
+        df_raw.loc[(df_raw['Session Type'] == 'Contributed Poster Presentations'), 'exported_to_csv'] = 1
+        print(f"  Saved {fname} to {os.path.join(cont_dir, fname)}")
+    else:
+        print(f"  File already exists: {os.path.join(cont_dir, fname)}") 
+
+    fname = 'abstracts_posters.xlsx'
+    if not os.path.exists(os.path.join(cont_dir, fname)):
+        df_raw_pstr.to_excel(os.path.join(cont_dir, fname), index=False)
+        print(f"  Saved talks.csv to {os.path.join(cont_dir, fname)}")
+    else:
+        print(f"  File already exists: {os.path.join(cont_dir, fname)}") 
+
+    # Update saved_abs_counter
+    saved_abs_counter += df_con.shape[0]
+    saved_abs_counter += df_pstr.shape[0]
+
+    # # Copy the full abstracts file to the division directory
+    # df_raw.loc[:, columns_to_keep].to_csv(os.path.join(div_dir, ab_file[:-5] + '.csv'), index=False)
+
+    # # Report all files that were saved
+    # print(f"    {division}: saved abstracts_revised.csv talks.csv, posters.csv.")
+    
+    # Check if the total number of saved abstracts matches the original count
+    if saved_abs_counter != num_abs:
+        raise ValueError("Mismatch in the number of abstracts: expected {}, but saved {}".format(num_abs, saved_abs_counter))
+
+    print("All abstracts successfully distributed to CSV files.")
+
+    # Save updated df_raw file (to troubleshoot abstracts not saved to CSV files)
+    # output_path = os.path.join(data_root, ab_file[:-5] + '_after_distribution.xlsx')
+    # df_raw.to_excel(output_path, index=False)
+
+
+def distribute_divisional_abstracts(data_root):
     """
     This function loads the abstract data from an xlsx file, extracts division and topic information, and saves different session types into separate csv files.
     Input:
@@ -462,7 +655,11 @@ def distribute_abstracts(data_root):
     # output_path = os.path.join(data_root, ab_file[:-5] + '_after_distribution.xlsx')
     # df_raw.to_excel(output_path, index=False)
 
+
 def get_keywords(data_root, division):
+    """
+    
+    """
 
     # Load the keywords file
     keywords_file_path = os.path.join(data_root, 'keywords.xlsx')

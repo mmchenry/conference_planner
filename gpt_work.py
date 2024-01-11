@@ -64,54 +64,51 @@ def analyze_abstracts(data_root, api_key_path, max_attempts=5):
     # Loop through talks and posters
     for csv_file in ratings_files:
 
-        # Loop through each csv file
-        for division in divisions:
+        # Read the abstract csv file
+        curr_dir = os.path.join(data_root, 'contributed')
+        csv_path = os.path.join(curr_dir, csv_file + '.csv')
+        df = pd.read_csv(csv_path)
 
-            # Read the abstract csv file
-            curr_dir = os.path.join(data_root, 'division_files', division)
-            csv_path = os.path.join(curr_dir, csv_file + '.csv')
-            df = pd.read_csv(csv_path)
+        print(f"Processing {csv_file} for division {division} ...")
 
-            print(f"Processing {csv_file} for division {division} ...")
+        # Get a list of all keyword columns
+        keywords = [col for col in df.columns if col not in ['id', 'clean_title', 'clean_abstract', 'summary']]
 
-            # Get a list of all keyword columns
-            keywords = [col for col in df.columns if col not in ['id', 'clean_title', 'clean_abstract', 'summary']]
+        # Loop through each row of df
+        for i, row in df.iterrows():
 
-            # Loop through each row of df
-            for i, row in df.iterrows():
+            # Execute only if all keywords columns are empty
+            if row[keywords].isnull().all():
+                abstract_text = row['clean_abstract']
+                prompt_text = give_prompt(keywords, abstract_text)
 
-                # Execute only if all keywords columns are empty
-                if row[keywords].isnull().all():
-                    abstract_text = row['clean_abstract']
-                    prompt_text = give_prompt(keywords, abstract_text)
+                # Initialize attempt counter
+                attempt = 0
 
-                    # Initialize attempt counter
-                    attempt = 0
-
-                    # Try to obtain the response up to max_attempts times
-                    while attempt < max_attempts:
-                        try:
-                            updated_row = interact_with_gpt4(prompt_text, api_key, row.copy())
-                            if updated_row[keywords].isnull().all():
-                                print(f"Attempt {attempt+1} failed, retrying...")
-                                attempt += 1
-                            else:
-                                # Update the DataFrame at the current row if successful
-                                df.iloc[i] = updated_row
-                                break
-                        except Exception as e:
-                            print(f"Attempt {attempt+1} encountered an error: {e}")
+                # Try to obtain the response up to max_attempts times
+                while attempt < max_attempts:
+                    try:
+                        updated_row = interact_with_gpt4(prompt_text, api_key, row.copy())
+                        if updated_row[keywords].isnull().all():
+                            print(f"Attempt {attempt+1} failed, retrying...")
                             attempt += 1
+                        else:
+                            # Update the DataFrame at the current row if successful
+                            df.iloc[i] = updated_row
+                            break
+                    except Exception as e:
+                        print(f"Attempt {attempt+1} encountered an error: {e}")
+                        attempt += 1
 
-                    # Check if the maximum number of attempts was reached
-                    if attempt == max_attempts:
-                        raise RuntimeError(f"  Maximum attempts reached for abstract {i+1}. Unable to retrieve ratings.")
-                    
-                    # Save the DataFrame at the end of each abstract
-                    df.to_csv(csv_path, index=False)
+                # Check if the maximum number of attempts was reached
+                if attempt == max_attempts:
+                    raise RuntimeError(f"  Maximum attempts reached for abstract {i+1}. Unable to retrieve ratings.")
                 
-                # Report completion of abstract
-                print(f"   abstract {i+1} completed. {len(df) - (i+1)} remaining.")
+                # Save the DataFrame at the end of each abstract
+                df.to_csv(csv_path, index=False)
+            
+            # Report completion of abstract
+            print(f"   abstract {i+1} completed. {len(df) - (i+1)} remaining.")
 
         # Report completion of division
         print(f"Completed {csv_file} for division {division}.")
@@ -119,7 +116,6 @@ def analyze_abstracts(data_root, api_key_path, max_attempts=5):
     # Report completion of all divisions
     print(" ")
     print("Keywords ratings for all divisions completed.")
-
 
 
 def interact_with_gpt4(prompt_text, api_key, row):

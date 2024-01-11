@@ -3,50 +3,58 @@ import pandas as pd
 import markdown
 import make_sessions as ms
 
-def merge_dataframes(df, data_root):
-    """
-    Creates a dataframe with all the abstract data for a given division.
-    """
-
-    # Load all abstract data
-    df_raw = pd.read_csv(os.path.join(data_root, 'abstracts_revised.csv'))
-
-    # Select only the 'ID' and 'Abtitle' columns from df_raw, and rename 'Abtitle' to 'title'
-    # df_raw_selected = df_raw[['id', 'title']].rename(columns={'AbTitle': 'title'})
-
-    # Merge selected columns from df_raw into df on the matching IDs
-    df_full = pd.merge(df, df_raw, how='left', left_on='id', right_on='id')
-
-    # Optionally, you can drop the extra 'ID' column if it's redundant
-    # df_full.drop('id', axis=1, inplace=True)
-
-    return df_full
 
 
-def list_branches_html(df, data_root, presentation_type, branch_summ, include_summary=False):
+
+def render_schedule_html(data_root, presentation_type, grouping_level='sessions', include_summary=False):
     """
     Generate a schedule of sessions within each major branch in HTML format from CSV files.
     """
 
+    # Load abstract data for presentation type
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_complete.csv'))
+
     # Initiate the markdown string
     markdown_str = ""
 
-    # Loop through each session
-    for branch in sorted(df['major_branch'].unique()):
+    # Listings and summary data for sessions/groups
+    if grouping_level == 'sessions':
+        group_list = sorted(df['session_num'].unique())
+        group_summ = pd.read_csv(os.path.join(data_root,  presentation_type + '_session_summary.csv'))
+
+    elif grouping_level == 'groups':
+        group_list = sorted(df['major_group'].unique())
+        group_summ = pd.read_csv(os.path.join(data_root,  presentation_type + '_group_summary.csv'))
+
+    # Raise exception if group_list is empty
+    if len(group_list) == 0:
+        raise ValueError("group_list is empty")
+    
+    # Loop through each group
+    for group in group_list:
 
         markdown_str += f"-------------------------------------------------------------- \n\n"
 
         # Get the "Top keywords" for branch match to the "Branch" column of branch_summ
-        branch_keywords = branch_summ[branch_summ['Branch'] == branch]['Top Keywords'].values[0]
+        if grouping_level == 'groups':
+            group_keywords = group_summ[group_summ['Group'] == group]['Top Keywords'].values[0]
+        else:
+            group_keywords = group_summ[group_summ['Session'] == group]['Top Keywords'].values[0]
 
-        
-        # Add the session title
-        markdown_str += f"### Branch {branch}  {branch_keywords}\n\n"
+        # Add the session/group title
+        if grouping_level == 'groups':
+            markdown_str += f"### Group {group}  {group_keywords}\n\n"
+        elif grouping_level == 'sessions':
+            markdown_str += f"### Session {group}  {group_keywords}\n\n"
 
         # markdown_str += f"{branch_keywords}\n\n"
 
-        # Get the dataframe for the current session
-        session_df = df[df['major_branch'] == branch]
+        # Get the dataframe for the current session/group
+        if grouping_level == 'groups':
+            session_df = df[df['major_group'] == group]
+
+        elif grouping_level == 'sessions':
+            session_df = df[df['session_num'] == group]
 
         # Sort the session dataframe by talk_num
         session_df = session_df.sort_values(by='talk_num')
@@ -57,9 +65,8 @@ def list_branches_html(df, data_root, presentation_type, branch_summ, include_su
             # Abstract title
             ab_title = row['title']
 
-            # remove space at the end of ab_title
-            if ab_title[-1] == ' ':
-                ab_title = ab_title[:-1]
+            # Remove spaces at the beginning and end of ab_title
+            ab_title = ab_title.strip()
 
             # Restate the tile in sentance case
             ab_title = ab_title[0].upper() + ab_title[1:].lower()
@@ -80,6 +87,7 @@ def list_branches_html(df, data_root, presentation_type, branch_summ, include_su
 
     print(f"Schedule written to {output_file}")
     print("Copy and paste path into a web browser")
+
 
 
 def render_div_schedule_html(df_full, df, df_weights, data_root, presentation_type, include_summary=False, num_ratings=6, include_ratings=True):
@@ -191,16 +199,3 @@ def top_ratings(curr_ratings, num_ratings=4):
     formatted_ratings = [f"{rating} ({value:.2f})" for rating, value in top_ratings['rating'].items()]
 
     return formatted_ratings
-
-
-def render_meeting_schedule_html(df_full, division, presentation_type, output_dir, include_summary=False):
-    """
-    Generate a schedule of sessions for entire meeting in HTML format, from divisional CSV files.
-
-    Parameters:
-    - source_dir (str): Path to the directory containing the source abstracts Excel file.
-    - inter_dir (str): Path to the directory containing session CSV files.
-    - output_dir (str): Path to the directory for output HTML files.
-    - abstract_filename (str): Name of the Excel file containing abstracts.
-    """
-# TODO
