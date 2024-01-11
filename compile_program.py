@@ -2,6 +2,9 @@ import os
 import pandas as pd
 import markdown
 import make_sessions as ms
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import math
 
 
 
@@ -11,8 +14,20 @@ def render_schedule_html(data_root, presentation_type, grouping_level='sessions'
     Generate a schedule of sessions within each major branch in HTML format from CSV files.
     """
 
+    # Load grouping data
+    df_group = pd.read_csv(os.path.join(data_root,  presentation_type + '_grouping.csv'), index_col='id')
+
+    # Load rating data for presentation type
+    df_ratings = pd.read_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index_col='id')
+
     # Load abstract data for presentation type
-    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_complete.csv'))
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '.csv'), index_col='id')
+
+    # Add the major_group column to df, matching indicies
+    df['major_group'] = df_group['major_group']
+    df['session_num'] = df_group['session_num']
+    df['summary']     = df_ratings['summary']
+    df['talk_num']    = df_group['talk_num']
 
     # Initiate the markdown string
     markdown_str = ""
@@ -56,8 +71,10 @@ def render_schedule_html(data_root, presentation_type, grouping_level='sessions'
         elif grouping_level == 'sessions':
             session_df = df[df['session_num'] == group]
 
-        # Sort the session dataframe by talk_num
-        session_df = session_df.sort_values(by='talk_num')
+            # if there are values for talk_num
+            if len(session_df['talk_num'].unique()) > 0:
+                # Sort the session dataframe by talk_num
+                session_df = session_df.sort_values(by='talk_num')
 
         # Loop through each talk in the session
         for _, row in session_df.iterrows():
@@ -79,13 +96,18 @@ def render_schedule_html(data_root, presentation_type, grouping_level='sessions'
                 markdown_str += f"**{ab_title}**\n\n"
 
     html_str = markdown.markdown(markdown_str)
-
-    output_file = os.path.join(data_root, 'branches_' + presentation_type + '.html')
-
-    with open(output_file, 'w') as f:
-        f.write(html_str)
-
-    print(f"Schedule written to {output_file}")
+  
+    # Write the output to a file   
+    if grouping_level == 'groups':
+        output_file = os.path.join(data_root, 'groups_' + presentation_type + '.html')
+        with open(output_file, 'w') as f:
+            f.write(html_str)
+        print(f"Groups written to {output_file}")
+    else:
+        output_file = os.path.join(data_root, 'sessions_' + presentation_type + '.html')
+        with open(output_file, 'w') as f:
+            f.write(html_str)
+        print(f"Sessions written to {output_file}")
     print("Copy and paste path into a web browser")
 
 
@@ -164,6 +186,7 @@ def render_div_schedule_html(df_full, df, df_weights, data_root, presentation_ty
     print(f"Schedule written to {output_file}")
     print("Copy and paste path into a web browser")
 
+
 def top_ratings(curr_ratings, num_ratings=4):
     """
     Get the top N ratings for a given presentation.
@@ -199,3 +222,64 @@ def top_ratings(curr_ratings, num_ratings=4):
     formatted_ratings = [f"{rating} ({value:.2f})" for rating, value in top_ratings['rating'].items()]
 
     return formatted_ratings
+
+
+def word_cloud(data_root, presentation_type, grouping_level='groups', num_columns=4):
+    """
+    Generate a word cloud for each session/group in a presentation type.
+    
+    Parameters:
+    - data_root (str): Path to the directory containing the CSV files.
+    - presentation_type (str): Name of the presentation type.
+    - grouping_level (str): Level of grouping to use for the word cloud.
+    - num_columns (int): Number of columns for the subplot.
+    
+    Returns:
+    - None
+    """
+
+
+    # Load grouping data
+    df_group = pd.read_csv(os.path.join(data_root,  presentation_type + '_grouping.csv'), index_col='id')
+
+    # Load abstract data for presentation type
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '.csv'), index_col='id')
+
+    # Add the major_group column to df, matching indicies
+    df['major_group'] = df_group['major_group']
+    df['session_num'] = df_group['session_num']
+    df['talk_num']    = df_group['talk_num']
+
+    if grouping_level == 'groups':
+        group_list = sorted(df['major_group'].unique())
+
+    # Determine the number of rows needed for the subplot
+    num_groups = len(group_list)
+    
+    num_rows = math.ceil(num_groups / num_columns)
+
+    # Create a figure for the subplots
+    plt.figure(figsize=(20, 5 * num_rows))
+
+    # Loop through each group
+    for i, group in enumerate(group_list, 1):
+        # Get the dataframe for the current session/group
+        session_df = df[df['major_group'] == group]
+
+        # Concatenate all abstracts in the group
+        text = ' '.join(session_df['clean_abstract'].dropna())
+
+        # Create a word cloud object
+        wordcloud = WordCloud(width=800, height=800, 
+                              background_color='white', 
+                              min_font_size=10).generate(text)
+
+        # Add subplot for each group
+        plt.subplot(num_rows, num_columns, i)
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.title(f'Group {group}')
+        plt.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+

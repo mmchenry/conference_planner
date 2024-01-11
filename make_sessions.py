@@ -9,7 +9,7 @@ from scipy.cluster.hierarchy import fcluster
 from scipy.cluster import hierarchy
 import random
 import string
-import network_analysis as na
+# import network_analysis as na
 
 
 
@@ -71,7 +71,6 @@ def extract_ratings(df, df_weights, analysis_step='clustering', include_id=False
 
 
 
-
 def find_combinations(target_sum, min_value=6, max_value=8):
     """
     Returns a list of lists of integers that sum to target_sum, with each list containing integers between min_value and max_value (inclusive). If a combination of integers that sum to target_sum does not exist, one of the numbers is permitted to be less than min_value.
@@ -116,6 +115,49 @@ def find_combinations(target_sum, min_value=6, max_value=8):
     # Sort numbers in each set
     results = [sorted(x) for x in results]
 
+    return results
+
+
+def is_divisible_by_combinations(number, current_sum=0, max_sum=None):
+    """
+    Determines whether a number is divisible by the sum of any combination of 6, 7, and 8.
+
+    Parameters:
+    - number (int): The number to check.
+    - current_sum (int): The current sum of the digits.
+    - max_sum (int): The maximum sum of the digits.
+
+    Returns:
+    - bool: Whether the number is divisible by the sum of any combination of 6, 7, and 8.
+    """
+
+    digits=[6, 7, 8]
+    
+    if max_sum is None:
+        max_sum = number
+
+    # Base case: if current_sum exceeds max_sum, stop the recursion
+    if current_sum > max_sum:
+        return False
+
+    # Check if the current sum divides the number
+    if current_sum != 0 and number % current_sum == 0:
+        return True
+
+    # Recursive case: try adding each digit to the current sum and recurse
+    for digit in digits:
+        if is_divisible_by_combinations(number, current_sum + digit, max_sum):
+            return True
+
+    return False
+
+def check_divisibility(numbers):
+    """
+    Tests whether each number in a list is divisible by the sum of any combination of 6, 7, and 8 using is_divisible_by_combinations().
+    """
+    results = {}
+    for number in numbers:
+        results[number] = is_divisible_by_combinations(number)
     return results
 
 
@@ -200,10 +242,17 @@ def summarize_group_keywords(data_root, presentation_type, grouping_level='group
     - branch_summaries (DataFrame): DataFrame containing the summary for each branch.
     """
 
-    # Load abstract data for presentation type
-    in_path = os.path.join(data_root,  presentation_type + '_ratings.csv')
-    df = pd.read_csv(in_path)
+    # Load grouping data
+    df_group = pd.read_csv(os.path.join(data_root,  presentation_type + '_grouping.csv'), index_col='id')
 
+    # Load abstract data for presentation type
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index_col='id')
+
+    # Add the major_group column to df, matching indicies
+    df['major_group'] = df_group['major_group']
+    df['session_num'] = df_group['session_num']
+    df['talk_num']    = df_group['talk_num']
+    
     # Load keyword weights
     df_weights = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx')) 
 
@@ -227,8 +276,9 @@ def summarize_group_keywords(data_root, presentation_type, grouping_level='group
     else:
         raise ValueError(f"Invalid grouping_level: {grouping_level}")
 
+    if len(branch_means) == 0:
+        raise ValueError("branch_means is empty")
     
-
     # Iterate over each branch
     for branch, data in branch_means.iterrows():
 
@@ -263,9 +313,9 @@ def summarize_group_keywords(data_root, presentation_type, grouping_level='group
 
 
 
-def run_hierarchical(data_root, presentation_type='talks', data_type='similarity', min_size=16):
+def run_hierarchical(data_root, presentation_type='talks', data_type='similarity', min_size=12):
     """
-    Runs hierarchical clustering on the DataFrame until some sessions are found in desired range of sizes.
+    Runs hierarchical clustering on the DataFrame until some sessions are found in desired range of sizes. Saves a csv file ('_grouping.csv') with the major_group assignments.
 
     Parameters:
     - data_root (str): Path to the data folder.
@@ -274,9 +324,11 @@ def run_hierarchical(data_root, presentation_type='talks', data_type='similarity
     - min_size (int): Minimum number of abstracts per major branch.
 
     Returns:
-    - df (DataFrame): DataFrame containing the abstracts and ratings, with major_group column added.
     - distance_threshold (float): Distance threshold used for clustering.
     """
+
+    # Path for the output file
+    out_path = os.path.join(data_root,  presentation_type + '_grouping.csv')
 
     # Threshold for cutting the dendrogram
     distance_threshold = 1
@@ -297,7 +349,7 @@ def run_hierarchical(data_root, presentation_type='talks', data_type='similarity
     while distance_threshold<max_distance:
         try:        
             # Run hierarchical clustering
-            df = hierarchical_clustering(data_root,  distance_threshold=distance_threshold, 
+            Z, df = hierarchical_clustering(data_root,  distance_threshold=distance_threshold, 
                                          presentation_type=presentation_type, data_type=data_type, 
                                          display_dendrogram=False)
 
@@ -305,9 +357,19 @@ def run_hierarchical(data_root, presentation_type='talks', data_type='similarity
             num_talks = df['major_group'].value_counts()
 
             # if prop_valid>=prop_threshold:
-            if np.min(num_talks) >= min_size:
-                success = True
-                break
+            if (np.min(num_talks) >= min_size):
+                if (presentation_type=='talks'):
+                    # Check that group is divisible by 6, 7, or 8
+                    divisibility = check_divisibility(num_talks)
+
+                    if all(divisibility.values()):
+                        success = True
+                        break
+                    else:
+                        distance_threshold += dist_increment
+                else:
+                    success = True
+                    break
             else:
                 distance_threshold += dist_increment
 
@@ -325,11 +387,16 @@ def run_hierarchical(data_root, presentation_type='talks', data_type='similarity
         # Fuse clusters, if necessary
         df = fuse_clusters(df, min_size)
 
+    # Create new dataframe, df_group, with the id and major_group columns, add columns for session_num and talk_num
+    df_group = df[['major_group']].copy()
+    df_group['session_num'] = np.nan
+    df_group['talk_num'] = np.nan
+
     # Write updated dataframe
-    df.to_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index=False) 
-    print(f"Saved {presentation_type} with major_group assignments to {os.path.join(data_root,  presentation_type + '_ratings.csv')}")   
+    df_group.to_csv(out_path, index=True) 
+    print(f"Saved {presentation_type} data with major_group assignments to {out_path}")   
     
-    return distance_threshold
+    return Z, distance_threshold
 
 
 def hierarchical_clustering(data_root, distance_threshold, presentation_type='talks', 
@@ -348,13 +415,12 @@ def hierarchical_clustering(data_root, distance_threshold, presentation_type='ta
     """
 
     # Load abstract data for presentation type
-    in_path = os.path.join(data_root,  presentation_type + '_ratings.csv')
-    df = pd.read_csv(in_path)
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index_col='id')
 
     # Clustering based on similarity
     if data_type == 'similarity':
         # Load similarity matrix
-        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col=0)
+        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col='id')
 
         # Convert similarity to distance (assuming similarity is between 0 and 1)
         distance_matrix = df_sim.max().max() + 0.000001 - df_sim
@@ -389,12 +455,12 @@ def hierarchical_clustering(data_root, distance_threshold, presentation_type='ta
     df['major_group'] = labeled_clusters
 
     if display_dendrogram:
-        plot_dendrogram(df, distance_threshold)
+        plot_dendrogram(Z, distance_threshold)
 
-    return df
+    return Z, df
 
 
-def plot_dendrogram(data_root, presentation_type, distance_threshold):
+def plot_dendrogram(Z, distance_threshold=None):
     """
     Plots the dendrogram for the hierarchical clustering.
     
@@ -403,23 +469,11 @@ def plot_dendrogram(data_root, presentation_type, distance_threshold):
     - distance_threshold (float): Distance threshold used for clustering.
     """
 
-    # Load abstract data for presentation type
-    in_path = os.path.join(data_root,  presentation_type + '_ratings.csv')
-    df = pd.read_csv(in_path)
-
-    # Load keyword weights
-    df_weights = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx')) 
-
-    # Extract ratings
-    ratings = extract_ratings(df, df_weights, analysis_step='clustering')
-
-    # Perform hierarchical clustering
-    Z = hierarchy.linkage(ratings, method='ward')
-
     # Create and show a rotated dendrogram
     plt.figure(figsize=(10, 7))
     hierarchy.dendrogram(Z, orientation='left', color_threshold=distance_threshold)
-    plt.axvline(x=distance_threshold, color='r', linestyle='--')
+    if distance_threshold is not None:
+        plt.axvline(x=distance_threshold, color='r', linestyle='--')
     plt.show()
 
 
@@ -439,15 +493,20 @@ def make_sessions(data_root, presentation_type='talks', data_type='similarity', 
 
     # Load keyword weights
     if data_type == 'similarity':
-        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col=0)      
+        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col='id')     
+        # Convert the columns of df_sim to integers
+        df_sim.columns = df_sim.columns.astype(int) 
     elif data_type == 'keywords':
         df_weights = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx'))
     else:
         raise ValueError(f"Invalid data_type: {data_type}")
 
-
     # Load abstract data for presentation type
-    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'))
+    df = pd.read_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index_col='id')
+
+    # Load grouping data
+    group_path = os.path.join(data_root,  presentation_type + '_grouping.csv')
+    df_group   = pd.read_csv(group_path, index_col='id')
 
     # if there is a session_num value, set session_num to the next value
     if df['session_num'].notnull().any():
@@ -457,18 +516,19 @@ def make_sessions(data_root, presentation_type='talks', data_type='similarity', 
         session_num = 1
 
     # Loop through each major branch
-    for branch, group in df.groupby('major_group'):
+    for branch, group in df_group.groupby('major_group'):
 
         # Update status
         if echo:
             print(f"Processing group {branch} . . .")
         
         # Number of talks in group
-        num_talks = len(group)
+        # num_talks = len(group)
             
         # Indicies for set of sessions with closest distances
         if data_type == 'similarity':
             set_idx = find_best_matches(group, data_type, min_size, max_size, df_sim=df_sim)
+
         elif data_type == 'keywords':
             set_idx = find_best_matches(group, data_type, min_size, max_size, df_weights=df_weights)
 
@@ -476,25 +536,20 @@ def make_sessions(data_root, presentation_type='talks', data_type='similarity', 
         for sess_idx in set_idx:
 
             # Set the session_num for each talk in the group
-            df.loc[sess_idx, 'session_num'] = str(int(session_num))
+            df_group.loc[sess_idx, 'session_num'] = str(int(session_num))
 
             # Add talk numbers
-            # df.loc[sess_idx, 'talk_num'] = np.arange(1,len(sess_idx)+1).astype(int)
-            # Assign a range of integers to the 'talk_num' column for the specified indices
-            # Assign a range of integers to the 'talk_num' column for the specified indices
-            # Assign a range of integers to the 'talk_num' column for the specified indices
-            df.loc[sess_idx, 'talk_num'] = np.arange(1, len(sess_idx) + 1)
+            df_group.loc[sess_idx, 'talk_num'] = np.arange(1, len(sess_idx) + 1)
 
             # Convert 'talk_num' to strings formatted as integers, handling NaNs and non-numeric types
-            df['talk_num'] = df['talk_num'].apply(lambda x: '{:.0f}'.format(x) if pd.notna(x) and np.issubdtype(type(x), np.number) else x)
-
+            df_group['talk_num'] = df_group['talk_num'].apply(lambda x: '{:.0f}'.format(x) if pd.notna(x) and np.issubdtype(type(x), np.number) else x)
 
             # Advance the session number
             session_num += 1
 
     # Save the dataframe to a csv file
-    df.to_csv(os.path.join(data_root,  presentation_type + '_ratings.csv'), index=False)
-    print(f"Saved {presentation_type} with session numbers to {os.path.join(data_root,  presentation_type + '_ratings.csv')}")
+    df_group.to_csv(group_path, index=True)
+    print(f"Saved {presentation_type} with session numbers to {group_path}")
 
 
 def find_best_matches(group, data_type, min_size, max_size, df_weights=None, df_sim=None):
@@ -541,6 +596,10 @@ def find_best_matches(group, data_type, min_size, max_size, df_weights=None, df_
 
             # Loop thru each set in curr_set
             for set_size in curr_set:
+                
+                if len(remaining_talks) < set_size:
+                    print("Not enough remaining talks to form a session group.")
+                    break
 
                 # Randomly select the seed talk index
                 curr_index = random.choice(remaining_talks)
@@ -553,15 +612,28 @@ def find_best_matches(group, data_type, min_size, max_size, df_weights=None, df_
                 # Loop thru items in each set to find order of closest talks
                 for _ in range(set_size):
 
-                    # Select the talk closest to the seed index
+                    # Select the talk closest to the seed index using similarity data
                     if data_type == 'similarity':
-                        sorted_distances = df_sim.loc[curr_index, remaining_talks].sort_values(ascending=False)
+                        valid_talks = [talk for talk in remaining_talks if talk in df_sim.columns]
+                        if not valid_talks:
+                            print("No valid talks remaining.")
+                            break
+
+                        sorted_similarities = df_sim.loc[curr_index, valid_talks].sort_values(ascending=False)
+                        if sorted_similarities.empty:
+                            print("sorted_similarities is empty.")
+                            break
+
+                        next_talk = sorted_similarities.index[0]
+
+                    # Select the talk closest to the seed index using keyword data
                     elif data_type == 'keywords':
                         sorted_distances = df_dists.loc[curr_index, remaining_talks].sort_values()
+                        next_talk = sorted_distances.index[0]
                     else:
                         raise ValueError(f"Invalid data_type: {data_type}")
                         
-                    next_talk = sorted_distances.index[0]
+                    # next_talk = sorted_distances.index[0]
 
                     # Add the talk to the selected talks
                     selected_talks.append(next_talk)
@@ -572,11 +644,17 @@ def find_best_matches(group, data_type, min_size, max_size, df_weights=None, df_
                     # Remove the talk from remaining_talks
                     remaining_talks.remove(next_talk)
 
-                # Add the selected talks to session_groups
-                session_groups.append(selected_talks)
+                if selected_talks:
+                    # Add the selected talks to session_groups
+                    session_groups.append(selected_talks)
 
-                # Calculate the mean distance between talks in each session group
-                subset = df_dists.loc[selected_talks, selected_talks]
+                if data_type == 'keywords':
+                    # Calculate the mean distance between talks in each session group
+                    subset = df_dists.loc[selected_talks, selected_talks]
+                else:
+                    # Calculate the mean difference between talks in each session group
+                    subset = 1-df_sim.loc[selected_talks, selected_talks]
+
                 mean_distance = subset.mean().mean()
                 session_group_scores.append(mean_distance)
 

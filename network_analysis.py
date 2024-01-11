@@ -75,10 +75,12 @@ def calc_similarity(data_root, presentation_type='talks'):
         similarity_df.values[np.tril_indices_from(similarity_df.values, -1)] = np.nan
 
         # Calculate the 99% quantile of the non-NaN values
-        quantile_99 = similarity_df.stack().quantile(0.99)
+        # quantile_99 = similarity_df.stack().quantile(0.99)
+        # similarity_df = similarity_df.applymap(lambda x: x / quantile_99 if pd.notnull(x) else np.nan)
 
-        # Normalize the remaining values to the 99% quantile
-        similarity_df = similarity_df.applymap(lambda x: x / quantile_99 if pd.notnull(x) else np.nan)
+        # Normalize the DataFrame by the maximum value
+        max_value = similarity_df.stack().max()
+        similarity_df = similarity_df.applymap(lambda x: x / max_value if pd.notnull(x) else np.nan)
 
 
         # Write to disk
