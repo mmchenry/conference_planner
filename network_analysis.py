@@ -15,12 +15,13 @@ import itertools
 
 
 
-def calc_similarity(data_root, presentation_type='talks'):
+def calc_similarity(data_root, presentation_type='talks', organization_level='division'):
     """
     Finds the cosine similarity between each pair of presentations and writes the results to a csv file.
     Parameters:
     - data_root (str): Path to the data directory.
     - presentation_type (str): Type of presentations to analyze. Options are 'talks', 'posters', or 'both'.
+    - 'organization_level' (str): Level of organization for the similarity data. Options are 'division', 'group' or 'session'.
     Returns:
     - None
     """
@@ -36,39 +37,68 @@ def calc_similarity(data_root, presentation_type='talks'):
         raise ValueError(f"Invalid presentation type '{presentation_type}'.")
 
     # Load keyword weights
-    df_weights = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx'))
+    df_weights     = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx'))
+    df_colweights  = pd.read_excel(os.path.join(data_root, 'column_weights.xlsx'))
 
     # Loop thru talk and poster files
     for pres_type in presentations:
 
-        # Input and output files
-        in_path    = os.path.join(data_root, 'contributed', pres_type + '_ratings.csv')
-        out_path   = os.path.join(data_root, 'contributed', pres_type + '_similarity.csv')
+        # Input and output paths depend on the organization level
+        if organization_level=='division':
+            out_path     = os.path.join(data_root, 'contributed', pres_type + '_similarity.csv')
+            df_path      = os.path.join(data_root, 'contributed', pres_type + '.csv')
+            ratings_path = os.path.join(data_root, 'contributed', pres_type + '_ratings.csv')
+        elif organization_level=='group':
+            out_path     = os.path.join(data_root, pres_type + '_similarity_group.csv')
+            ratings_path = os.path.join(data_root, pres_type + '_ratings.csv')
+            df_path      = os.path.join(data_root, pres_type + '.csv')
+        elif organization_level=='session':
+            out_path      = os.path.join(data_root, pres_type + '_similarity_session.csv')
+            ratings_path  = os.path.join(data_root, pres_type + '_ratings.csv')
+            df_path       = os.path.join(data_root, pres_type + '.csv')
+        else:
+            raise ValueError(f"Invalid organization level '{organization_level}'.")
+
+        # Load keyword ratings for presentation type
+        df_ratings = pd.read_csv(ratings_path, index_col='id')
 
         # Load abstract data for presentation type
-        df = pd.read_csv(in_path)
+        df = pd.read_csv(df_path, index_col='id')
 
-        # Check for duplicate IDs
-        duplicate_ids = df['id'].duplicated()
-        if duplicate_ids.any():
-            raise ValueError(f"Duplicate IDs found in {pres_type} data: {duplicate_ids}")
+        # Loop thru each row of df_colweights
+        for _, row in df_colweights.iterrows():
 
-        # Set the 'id' column as the index of the DataFrame
-        df = df.set_index('id')
+            # Get the column name and weight
+            col_name  = row['column_name']
+            if organization_level=='group':
+                col_weight = row['group_weights']
+            elif organization_level=='session':
+                col_weight = row['session_weights']
+            else:
+                col_weight = row['division_weights']
 
-        # Number of presentations
-        num_pres = df.shape[0]
+            # Get a listing of all unique values in col_name in df
+            unique_vals = df[col_name].unique()
 
-        # Get weighted ratings from df and df_weights
-        df_ratings = extract_ratings(df, df_weights)
+            # Loop through each unique value in the specified column
+            for val in unique_vals:
+                # Create a new column in df_ratings for each unique value
+                # Set to 1 if the value in df[col_name] matches the unique value, else 0
+                df_ratings[val] = (df[col_name] == val).astype(int) * col_weight
+
+        # Remove columns that don't have any ratings
+        df_ratings = df_ratings.drop(columns=['clean_title', 'clean_abstract', 'summary'])
+
+        # Replace any nans with zeros 
+        df_ratings = df_ratings.fillna(0)
 
         # Calculate cosine similarity
         similarity = cosine_similarity(df_ratings)
 
         # Convert to a DataFrame for better readability
         similarity_df = pd.DataFrame(similarity)
-        similarity_df.index = df.index
-        similarity_df.columns = df.index
+        similarity_df.index = df_ratings.index
+        similarity_df.columns = df_ratings.index
 
         # Replace diagonal and lower triangle with NaNs
         np.fill_diagonal(similarity_df.values, np.nan)
@@ -81,7 +111,6 @@ def calc_similarity(data_root, presentation_type='talks'):
         # Normalize the DataFrame by the maximum value
         max_value = similarity_df.stack().max()
         similarity_df = similarity_df.applymap(lambda x: x / max_value if pd.notnull(x) else np.nan)
-
 
         # Write to disk
         similarity_df.to_csv(out_path, index=True)

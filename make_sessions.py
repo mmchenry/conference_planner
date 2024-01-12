@@ -38,11 +38,11 @@ def extract_ratings(df, df_weights, analysis_step='clustering', include_id=False
             
             # For hierarchical clustering 
             if analysis_step == 'clustering':
-                weight = df_weights.loc[df_weights['keyword'] == keyword, 'weight_clustering'].iloc[0]
+                weight = df_weights.loc[df_weights['keyword'] == keyword, 'group_weights'].iloc[0]
 
             # For sequencing
             elif analysis_step == 'sequencing':
-                weight = df_weights.loc[df_weights['keyword'] == keyword, 'weight_sequencing'].iloc[0]
+                weight = df_weights.loc[df_weights['keyword'] == keyword, 'session_weights'].iloc[0]
 
             else:
                 raise ValueError(f"Invalid analysis_step: {analysis_step}")
@@ -420,7 +420,7 @@ def hierarchical_clustering(data_root, distance_threshold, presentation_type='ta
     # Clustering based on similarity
     if data_type == 'similarity':
         # Load similarity matrix
-        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col='id')
+        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity_group.csv'), index_col='id')
 
         # Convert similarity to distance (assuming similarity is between 0 and 1)
         distance_matrix = df_sim.max().max() + 0.000001 - df_sim
@@ -493,9 +493,10 @@ def make_sessions(data_root, presentation_type='talks', data_type='similarity', 
 
     # Load keyword weights
     if data_type == 'similarity':
-        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity.csv'), index_col='id')     
+        df_sim = pd.read_csv(os.path.join(data_root, presentation_type + '_similarity_session.csv'), index_col='id')     
         # Convert the columns of df_sim to integers
         df_sim.columns = df_sim.columns.astype(int) 
+        
     elif data_type == 'keywords':
         df_weights = pd.read_excel(os.path.join(data_root, 'keyword_weights.xlsx'))
     else:
@@ -509,8 +510,8 @@ def make_sessions(data_root, presentation_type='talks', data_type='similarity', 
     df_group   = pd.read_csv(group_path, index_col='id')
 
     # if there is a session_num value, set session_num to the next value
-    if df['session_num'].notnull().any():
-        session_num = df['session_num'].max() + 1
+    if df_group['session_num'].notnull().any():
+        session_num = df_group['session_num'].max() + 1
     else:
         # Initialize session number
         session_num = 1
